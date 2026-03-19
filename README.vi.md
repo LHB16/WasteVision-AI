@@ -8,9 +8,18 @@
 [![Flask](https://img.shields.io/badge/Flask-Web%20Server-black?logo=flask)](https://flask.palletsprojects.com)
 [![ResNet50](https://img.shields.io/badge/Model-ResNet50-orange)](https://keras.io/api/applications/resnet/)
 [![ESP32](https://img.shields.io/badge/Hardware-ESP32--S3-red)](https://www.espressif.com)
+[![YouTube](https://img.shields.io/badge/Demo-YouTube-red?logo=youtube)](https://www.youtube.com/watch?v=EwzhzZWfLMA)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 [🇬🇧 English](./README.md) &nbsp;|&nbsp; 🇻🇳 Tiếng Việt
+
+---
+
+## 🎬 Video Demo
+
+[![WasteVision AI Demo](https://img.youtube.com/vi/EwzhzZWfLMA/maxresdefault.jpg)](https://www.youtube.com/watch?v=EwzhzZWfLMA)
+
+> ▶️ Bấm vào ảnh để xem video demo đầy đủ trên YouTube
 
 ---
 
@@ -144,6 +153,10 @@ Cảm biến IR phát hiện rác
 - Arduino IDE (để flash firmware ESP32-S3)
 - Telegram Bot Token
 
+### 0. Xem demo trước (tùy chọn)
+
+🎬 [https://www.youtube.com/watch?v=EwzhzZWfLMA](https://www.youtube.com/watch?v=EwzhzZWfLMA)
+
 ### 1. Clone repository
 
 ```bash
@@ -185,10 +198,6 @@ TELEGRAM_CHAT_ID=your_chat_id
 ESP32_IP=192.168.x.x
 FLASK_SECRET_KEY=your_secret_key
 ```
-
-**Cấu hình ESP32:**
-- Mở file `Sourse Code/IOT/main.cpp`
-- Thay đổi `YOUR_WIFI_SSID` và `YOUR_WIFI_PASSWORD` thành WiFi của bạn
 
 ### 5. Chạy AI Server
 
@@ -276,7 +285,8 @@ Dự án này được phân phối theo giấy phép [MIT](LICENSE).
 
 ---
 
-<p align="center">
-  <strong>WasteVision AI — Nhóm 2 | Đại học FPT</strong><br>
-  <em>Góp phần xây dựng môi trường xanh hơn 🌿</em>
-</p>
+---
+
+**WasteVision AI — Nhóm 2 | Đại học FPT**
+
+*Góp phần xây dựng môi trường xanh hơn 🌿*

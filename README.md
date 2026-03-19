@@ -8,9 +8,18 @@
 [![Flask](https://img.shields.io/badge/Flask-Web%20Server-black?logo=flask)](https://flask.palletsprojects.com)
 [![ResNet50](https://img.shields.io/badge/Model-ResNet50-orange)](https://keras.io/api/applications/resnet/)
 [![ESP32](https://img.shields.io/badge/Hardware-ESP32--S3-red)](https://www.espressif.com)
+[![YouTube](https://img.shields.io/badge/Demo-YouTube-red?logo=youtube)](https://www.youtube.com/watch?v=EwzhzZWfLMA)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 🇬🇧 English &nbsp;|&nbsp; [🇻🇳 Tiếng Việt](./README.vi.md)
+
+---
+
+## 🎬 Demo Video
+
+[![WasteVision AI Demo](https://img.youtube.com/vi/EwzhzZWfLMA/maxresdefault.jpg)](https://www.youtube.com/watch?v=EwzhzZWfLMA)
+
+> ▶️ Click the thumbnail to watch the full demo on YouTube
 
 ---
 
@@ -144,6 +153,10 @@ IR Sensor detects waste object
 - Arduino IDE (to flash ESP32-S3 firmware)
 - Telegram Bot Token
 
+### 0. Watch the demo first (optional)
+
+🎬 [https://www.youtube.com/watch?v=EwzhzZWfLMA](https://www.youtube.com/watch?v=EwzhzZWfLMA)
+
 ### 1. Clone the repository
 
 ```bash
@@ -175,7 +188,7 @@ WasteVision-AI/
         └── ...
 ```
 
-### 4. Environment Configuration
+### 4. Configure environment
 
 Create a `.env` file at the project root:
 
@@ -185,10 +198,6 @@ TELEGRAM_CHAT_ID=your_chat_id
 ESP32_IP=192.168.x.x
 FLASK_SECRET_KEY=your_secret_key
 ```
-
-**ESP32 Configuration:**
-- Open file `Source Code/IOT/main.cpp`
-- Change `YOUR_WIFI_SSID` and `YOUR_WIFI_PASSWORD` to your WiFi credentials
 
 ### 5. Run the AI Server
 
@@ -276,7 +285,8 @@ This project is distributed under the [MIT License](LICENSE).
 
 ---
 
-<p align="center">
-  <strong>WasteVision AI — Group 2 | FPT University</strong><br>
-  <em>Building a cleaner future, one piece of waste at a time 🌿</em>
-</p>
+---
+
+**WasteVision AI — Group 2 | FPT University**
+
+*Building a cleaner future, one piece of waste at a time 🌿*
