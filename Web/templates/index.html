@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WasteVision AI - Smart Waste Monitoring</title>
+  <link rel="icon" type="image/png" href="/static/logo.png">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg0:#070B16;
+      --bg1:#0B1224;
+      --panel: rgba(255,255,255,.05);
+      --panel2: rgba(255,255,255,.035);
+      --border: rgba(255,255,255,.10);
+      --text:#EAF1FF;
+      --muted:#9AB0D6;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --accent:#60a5fa;
+      --r:18px;
+      --r2:14px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+
+    /* Light Theme */
+    body.light-theme{
+      --bg0:#F5F7FA;
+      --bg1:#FFFFFF;
+      --panel: rgba(0,0,0,.05);
+      --panel2: rgba(0,0,0,.02);
+      --border: rgba(0,0,0,.15);
+      --text:#1A1F2E;
+      --muted:#6B7280;
+    }
+    body.light-theme .logo-mark{ color: #fff; }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; color:var(--text);
+      background:
+        radial-gradient(1200px 700px at 18% 5%, rgba(96,165,250,.15), transparent 50%),
+        radial-gradient(1000px 650px at 80% 20%, rgba(34,197,94,.10), transparent 50%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      min-height:100vh;
+    }
+
+    .wrap{ max-width:1400px; margin:0 auto; padding:40px 20px; }
+
+    .header{
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:30px; border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+      flex-wrap: wrap; gap: 15px;
+    }
+    .header-controls{
+      display:flex; gap:10px; align-items:center;
+    }
+    .lang-toggle, .theme-toggle{
+      padding:8px 16px; border:none; border-radius:99px;
+      background:var(--panel); border:1px solid var(--border);
+      color:var(--text); font-size:13px; font-weight:500;
+      cursor:pointer; transition:all 0.3s;
+    }
+    .lang-toggle:hover, .theme-toggle:hover{
+      background:var(--panel2); transform:translateY(-2px);
+    }
+    .lang-toggle.active, .theme-toggle.active{
+      background:var(--accent); color:#000; border-color:var(--accent);
+    }
+    .brand-group{ display:flex; align-items:center; gap:15px; }
+    .logo-mark{
+      width:50px; height:50px; border-radius:12px;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      background: transparent;
+    }
+    .logo-mark img{
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    h1{ margin:0; font-size:24px; font-weight: 800; letter-spacing: -0.5px; }
+    
+    .status-pill{
+      display:flex; align-items:center; gap:8px;
+      padding:8px 16px; border-radius:99px;
+      background: var(--panel); border: 1px solid var(--border);
+      font-size:13px; font-weight: 500;
+    }
+    .dot{ width:8px; height:8px; border-radius:50%; transition: 0.3s; }
+    .dot.online{ background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+    .dot.offline{ background: var(--bad); box-shadow: 0 0 10px var(--bad); }
+
+    /* Tabs */
+    .tabs{
+      display:flex; gap:10px; margin-bottom:20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab{
+      padding:12px 24px; cursor:pointer; border:none;
+      background:transparent; color:var(--muted);
+      font-size:14px; font-weight:500; border-bottom:2px solid transparent;
+      transition: all 0.3s;
+    }
+    .tab:hover{ color:var(--text); }
+    .tab.active{
+      color:var(--accent); border-bottom-color:var(--accent);
+    }
+
+    .tab-content{ display:none; }
+    .tab-content.active{ display:block; }
+
+    .grid{ display:grid; grid-template-columns: 1fr 320px; gap:20px; }
+    @media (max-width: 900px){ .grid{ grid-template-columns:1fr; } }
+
+    .card{
+      background: var(--panel); border:1px solid var(--border);
+      border-radius: var(--r); padding: 24px;
+      backdrop-filter: blur(10px);
+      margin-bottom:20px;
+    }
+    .card-title{ 
+      margin: 0 0 20px 0; font-size: 16px; color: var(--muted); 
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 10px;
+    }
+    @media (max-width: 600px) {
+      .card-title span { width: 100%; }
+      .card-title span button { flex: 1; font-size: 11px; padding: 6px 12px; }
+    }
+
+    .bins-container{ display: grid; gap: 15px; }
+    .bin-item{
+      background: var(--panel2); border: 1px solid var(--border);
+      border-radius: var(--r2); padding: 20px;
+    }
+    .bin-info{ display: flex; justify-content: space-between; margin-bottom: 12px; }
+    .bin-name{ font-weight: 700; font-size: 15px; }
+    .bin-val{ font-weight: 800; font-size: 20px; }
+    
+    .progress-bg{ height: 12px; background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; }
+    .progress-fill{ height: 100%; width: 0%; transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    .stats-grid{ display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .stat-box{
+      background: var(--panel2); border: 1px solid var(--border);
+      padding: 15px; border-radius: var(--r2);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .stat-label{ color: var(--muted); font-size: 13px; }
+    .stat-value{ font-weight: 700; font-size: 16px; }
+
+    /* History (tạm ẩn bằng class .hidden-section, giữ code để bật lại sau) */
+    .history-list{ max-height:500px; overflow-y:auto; }
+    .history-item{
+      background: var(--panel2); border:1px solid var(--border);
+      padding:15px; border-radius:var(--r2); margin-bottom:10px;
+    }
+    .history-date{ font-weight:700; margin-bottom:8px; color:var(--accent); }
+    .history-stats{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; }
+    .history-stat{ text-align:center; }
+    .history-stat-label{ font-size:11px; color:var(--muted); }
+    .history-stat-value{ font-size:18px; font-weight:700; }
+    .history-table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:12px;
+    }
+    .history-table thead{
+      position:sticky;
+      top:0;
+      background:var(--panel);
+      z-index:1;
+    }
+    .history-table th,
+    .history-table td{
+      padding:8px 10px;
+      border-bottom:1px solid var(--border);
+      text-align:left;
+      white-space:nowrap;
+    }
+    .history-table tbody tr:nth-child(even){
+      background:var(--panel2);
+    }
+    .history-table .tag{
+      display:inline-block;
+      padding:2px 8px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:600;
+    }
+    .history-table .tag-full{ background:rgba(34,197,94,0.15); color:var(--ok); }
+    .history-table .tag-warn{ background:rgba(245,158,11,0.15); color:var(--warn); }
+    .history-table .tag-danger{ background:rgba(239,68,68,0.15); color:var(--bad); }
+    .section-title-small{
+      margin:18px 0 8px 0;
+      font-size:13px;
+      font-weight:600;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:0.04em;
+    }
+
+    /* Statistics (tạm ẩn bằng class .hidden-section, giữ code để bật lại sau) */
+    .stat-highlight{
+      background: linear-gradient(135deg, var(--accent), var(--ok));
+      padding:20px; border-radius:var(--r2); margin-bottom:20px;
+      text-align:center;
+      box-shadow: 0 4px 12px rgba(96,165,250,0.2);
+    }
+    .stat-highlight-label{ 
+      font-size:12px; 
+      color:rgba(255,255,255,0.9); 
+      margin-bottom:5px; 
+      font-weight:600;
+      text-transform:uppercase;
+      letter-spacing:0.5px;
+    }
+    .stat-highlight-value{ 
+      font-size:32px; 
+      font-weight:800; 
+      color:#fff; 
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      margin:8px 0;
+    }
+    body.light-theme .stat-highlight-label{ color:rgba(0,0,0,0.8); }
+    body.light-theme .stat-highlight-value{ 
+      color:#fff; 
+      text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .chart-container{ position:relative; height:300px; margin-top:20px; }
+
+    /* Alert Button */
+    .btn{
+      padding:10px 20px; border:none; border-radius:var(--r2);
+      background:var(--accent); color:#000; font-weight:700;
+      cursor:pointer; transition:all 0.3s; margin-top:10px;
+    }
+    .btn:hover{ transform:translateY(-2px); box-shadow:0 4px 12px rgba(96,165,250,0.4); }
+    .btn:active{ transform:translateY(0); }
+    .btn-danger{ background:var(--bad); color:#fff; }
+
+    /* Modal */
+    .modal{
+      display:none; position:fixed; top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;
+    }
+    .modal.active{ display:flex; }
+    .modal-content{
+      background:var(--bg1); border:1px solid var(--border); border-radius:var(--r);
+      padding:30px; max-width:500px; width:90%; max-height:90vh; overflow-y:auto;
+    }
+    .modal-header{
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:15px;
+    }
+    .modal-title{ font-size:20px; font-weight:700; }
+    .close-btn{
+      background:none; border:none; color:var(--muted); font-size:24px;
+      cursor:pointer; padding:0; width:30px; height:30px;
+    }
+    .close-btn:hover{ color:var(--text); }
+    .form-group{ margin-bottom:15px; }
+    .form-label{ display:block; margin-bottom:5px; font-size:13px; color:var(--muted); }
+    .form-input{
+      width:100%; padding:10px; border:1px solid var(--border);
+      background:var(--panel); color:var(--text); border-radius:var(--r2);
+      font-size:14px;
+    }
+    .form-input:focus{ outline:none; border-color:var(--accent); }
+    .form-select{ width:100%; padding:10px; border:1px solid var(--border);
+      background:var(--panel); color:var(--text); border-radius:var(--r2); font-size:14px; }
+    .form-textarea{ width:100%; padding:10px; border:1px solid var(--border);
+      background:var(--panel); color:var(--text); border-radius:var(--r2);
+      font-size:14px; min-height:80px; resize:vertical; font-family:inherit; }
+    .btn-group{ display:flex; gap:10px; margin-top:20px; }
+    .status-badge{
+      display:inline-block; padding:4px 12px; border-radius:99px;
+      font-size:12px; font-weight:500; margin-left:10px;
+    }
+    .status-badge.enabled{ background:var(--ok); color:#000; }
+    .status-badge.disabled{ background:var(--bad); color:#fff; }
+
+    .footer-note{ margin-top: 20px; font-size: 12px; color: var(--muted); text-align: center; }
+    .hidden-section{ display:none !important; }
+    .mono{ font-family: 'Courier New', monospace; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="brand-group">
+        <div class="logo-mark">
+          <img src="/static/logo.png" alt="WasteVision AI Logo">
+        </div>
+        <h1 data-i18n="title">WasteVision AI <span style="font-weight:300; color:var(--muted)">Group2</span></h1>
+      </div>
+      <div style="display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
+        <div class="header-controls">
+          <button class="lang-toggle" id="langToggle" onclick="toggleLanguage()">
+            <span id="langText">VI</span>
+          </button>
+          <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
+            <span id="themeText">🌙</span>
+          </button>
+        </div>
+        <div class="status-pill">
+          <div id="statusDot" class="dot offline"></div>
+          <span id="statusText" data-i18n="connecting">Connecting...</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('dashboard')" data-i18n="tab.dashboard">📊 Dashboard</button>
+      <button class="tab" onclick="switchTab('history')" data-i18n="tab.history">📈 Thống kê</button>
+    </div>
+
+    <!-- Dashboard Tab -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="grid">
+        <section class="card">
+          <h2 class="card-title"><span data-i18n="dashboard.bins.title">Hệ thống thùng rác</span> <span data-i18n="dashboard.bins.subtitle">Dữ liệu thực tế</span></h2>
+          <div class="bins-container">
+            <div class="bin-item">
+              <div class="bin-info">
+                <span class="bin-name" data-i18n="bins.plastic">NHỰA (PLASTIC)</span>
+                <span class="bin-val" id="v_plastic">0%</span>
+              </div>
+              <div class="progress-bg"><div id="f_plastic" class="progress-fill"></div></div>
+            </div>
+            <div class="bin-item">
+              <div class="bin-info">
+                <span class="bin-name" data-i18n="bins.paper">GIẤY (PAPER)</span>
+                <span class="bin-val" id="v_paper">0%</span>
+              </div>
+              <div class="progress-bg"><div id="f_paper" class="progress-fill"></div></div>
+            </div>
+            <div class="bin-item">
+              <div class="bin-info">
+                <span class="bin-name" data-i18n="bins.metal">LON (METAL)</span>
+                <span class="bin-val" id="v_metal">0%</span>
+              </div>
+              <div class="progress-bg"><div id="f_metal" class="progress-fill"></div></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="card">
+          <h2 class="card-title" data-i18n="dashboard.sensors.title">Cảm biến & Môi trường</h2>
+          <div class="stats-grid">
+            <div class="stat-box">
+              <span class="stat-label" data-i18n="sensors.temperature">Nhiệt độ</span>
+              <span class="stat-value" id="temp">--°C</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label" data-i18n="sensors.gas">Khí độc</span>
+              <span class="stat-value" id="gas">-- ppm</span>
+            </div>
+            <div class="stat-box" id="alarmBox">
+              <span class="stat-label" data-i18n="sensors.alarm">Cảnh báo</span>
+              <span class="stat-value" id="alarm">SAFE</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label" data-i18n="sensors.wifi">WiFi</span>
+              <span class="stat-value mono" id="rssi">-- dBm</span>
+            </div>
+          </div>
+          <div style="margin-top:20px; font-size:11px; color:var(--muted)">
+            <span data-i18n="dashboard.lastUpdate">Cập nhật cuối</span>: <span id="lastUpdate">--</span>
+          </div>
+          <div id="mockIndicator" style="margin-top:10px; font-size:12px; color:#ff6b35; font-weight:bold; display:none;">
+            <!-- Dấu hiệu mock data sẽ hiển thị ở đây -->
+          </div>
+          <div style="display:flex; gap:10px; margin-top:15px;">
+            <button class="btn btn-danger" onclick="showReportModal()">
+              🚨 <span data-i18n="dashboard.report">Báo cáo sự cố</span>
+            </button>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- History / Statistics Tab -->
+    <div id="tab-history" class="tab-content">
+      <div class="card">
+        <h2 class="card-title">
+          <span data-i18n="history.title">Nhật ký bỏ rác</span>
+        </h2>
+        <div class="chart-container">
+          <canvas id="weekChart"></canvas>
+        </div>
+        <div id="historyList" class="history-list" style="margin-top:20px;">
+          <div id="historyLogContainer" style="text-align:center; color:var(--muted); padding:40px;" data-i18n="history.loading">
+            Đang tải lịch sử...
+          </div>
+        </div>
+        <div class="section-title-small" data-i18n="history.wasteTitle">Nhật ký loại rác nhận được</div>
+        <div id="wasteLogList" class="history-list" style="margin-top:4px; max-height:260px;">
+          <!-- Waste log table will be rendered here -->
+        </div>
+      </div>
+    </div>
+    
+    <div class="footer-note" data-i18n="footer">Hệ thống giám sát rác thải thông minh v3.0 • SE1912 • Nhóm 2</div>
+  </div>
+
+  <!-- Modal Báo cáo sự cố -->
+  <div id="reportModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title" data-i18n="report.title">🚨 Báo cáo sự cố</div>
+        <button class="close-btn" onclick="closeReportModal()">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-i18n="report.type">Loại sự cố:</label>
+        <div style="display:grid; gap:10px;">
+          <label style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:12px; background:var(--panel2); border-radius:var(--r2); border:1px solid var(--border);">
+            <input type="radio" name="reportType" value="machine_error" style="width:auto;">
+            <span>🔧 <span data-i18n="report.machine_error">Máy lỗi</span></span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:12px; background:var(--panel2); border-radius:var(--r2); border:1px solid var(--border);">
+            <input type="radio" name="reportType" value="fire" style="width:auto;">
+            <span>🔥 <span data-i18n="report.fire">Cháy</span></span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:12px; background:var(--panel2); border-radius:var(--r2); border:1px solid var(--border);">
+            <input type="radio" name="reportType" value="toxic_gas" style="width:auto;">
+            <span>☠️ <span data-i18n="report.toxic_gas">Khí độc</span></span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:12px; background:var(--panel2); border-radius:var(--r2); border:1px solid var(--border);">
+            <input type="radio" name="reportType" value="bin_full" style="width:auto;">
+            <span>🗑️ <span data-i18n="report.bin_full">Thùng đầy</span></span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:12px; background:var(--panel2); border-radius:var(--r2); border:1px solid var(--border);">
+            <input type="radio" name="reportType" value="other" style="width:auto;">
+            <span>📝 <span data-i18n="report.other">Khác</span></span>
+          </label>
+        </div>
+      </div>
+      <div class="form-group" id="customMessageGroup" style="display:none;">
+        <label class="form-label" data-i18n="report.custom_label">Mô tả chi tiết:</label>
+        <textarea id="customMessage" class="form-textarea" placeholder="" data-i18n-placeholder="report.custom_placeholder"></textarea>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-danger" onclick="sendReport()" style="flex:1;" data-i18n="report.send">Gửi báo cáo</button>
+        <button class="btn" onclick="closeReportModal()" style="background:var(--muted);" data-i18n="report.cancel">Hủy</button>
+      </div>
+      <div id="reportResult" style="margin-top:15px; padding:10px; border-radius:var(--r2); display:none;"></div>
+    </div>
+  </div>
+
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let weekChart = null;
+    
+    // Translation system
+    const translations = {
+      vi: {
+        title: "WasteVision AI Group2",
+        connecting: "Đang kết nối...",
+        connected: "Đã kết nối",
+        disconnected: "Mất kết nối",
+        "tab.dashboard": "📊 Dashboard",
+        "tab.history": "📈 Thống kê",
+        "dashboard.bins.title": "Hệ thống thùng rác",
+        "dashboard.bins.subtitle": "Dữ liệu thực tế",
+        "bins.plastic": "NHỰA (PLASTIC)",
+        "bins.paper": "GIẤY (PAPER)",
+        "bins.metal": "LON (METAL)",
+        "dashboard.sensors.title": "Cảm biến & Môi trường",
+        "sensors.temperature": "Nhiệt độ",
+        "sensors.gas": "Khí độc",
+        "sensors.alarm": "Cảnh báo",
+        "sensors.wifi": "WiFi",
+        "dashboard.lastUpdate": "Cập nhật cuối",
+        "dashboard.report": "Báo cáo sự cố",
+        "report.title": "🚨 Báo cáo sự cố",
+        "report.type": "Loại sự cố:",
+        "report.machine_error": "Máy lỗi",
+        "report.fire": "Cháy",
+        "report.toxic_gas": "Khí độc",
+        "report.bin_full": "Thùng đầy",
+        "report.other": "Khác",
+        "report.custom_label": "Mô tả chi tiết:",
+        "report.custom_placeholder": "Nhập mô tả chi tiết về sự cố...",
+        "report.send": "Gửi báo cáo",
+        "report.cancel": "Hủy",
+        "report.success": "✅ Báo cáo đã được gửi thành công!",
+        "report.error": "❌ Lỗi gửi báo cáo:",
+        "report.select_type": "Vui lòng chọn loại sự cố!",
+        "report.enter_description": "Vui lòng nhập mô tả chi tiết!",
+        "history.title": "Nhật ký bỏ rác",
+        "history.loading": "Đang tải lịch sử...",
+        "history.empty": "Chưa có dữ liệu lịch sử",
+        "history.error": "Lỗi tải lịch sử",
+        "history.date": "Ngày",
+        "history.time": "Giờ",
+        "history.type": "Loại",
+        "history.plastic": "Nhựa",
+        "history.paper": "Giấy",
+        "history.metal": "Lon",
+        "history.temp": "Nhiệt độ",
+        "history.gas": "Khí độc",
+        "history.wasteTitle": "Nhật ký loại rác nhận được",
+        "history.wasteEmpty": "Chưa có nhật ký loại rác",
+        "history.battery": "Pin",
+        "statistics.title": "Thống kê tuần này",
+        "statistics.loading": "Đang tải thống kê...",
+        "statistics.error": "Lỗi tải thống kê",
+        "statistics.mostCommon": "Loại nhiều nhất trong tuần",
+        "statistics.total": "Tổng",
+        "statistics.totalPlastic": "Tổng Nhựa",
+        "statistics.totalPaper": "Tổng Giấy",
+        "statistics.totalMetal": "Tổng Lon",
+        "export.csv": "📥 Export CSV",
+        "export.excel": "📊 Export Excel",
+        "export.summary": "📋 Tổng kết",
+        "footer": "Hệ thống giám sát rác thải thông minh v3.0 • SE1912 • Nhóm 2"
+      },
+      en: {
+        title: "WasteVision AI Group2",
+        connecting: "Connecting...",
+        connected: "Connected",
+        disconnected: "Disconnected",
+        "tab.dashboard": "📊 Dashboard",
+        "tab.history": "📈 Statistics",
+        "dashboard.bins.title": "Waste Bins System",
+        "dashboard.bins.subtitle": "Real-time Data",
+        "bins.plastic": "PLASTIC",
+        "bins.paper": "PAPER",
+        "bins.metal": "METAL",
+        "dashboard.sensors.title": "Sensors & Environment",
+        "sensors.temperature": "Temperature",
+        "sensors.gas": "Toxic Gas",
+        "sensors.alarm": "Alert",
+        "sensors.wifi": "WiFi",
+        "dashboard.lastUpdate": "Last Update",
+        "dashboard.report": "Report Issue",
+        "report.title": "🚨 Report Issue",
+        "report.type": "Issue Type:",
+        "report.machine_error": "Machine Error",
+        "report.fire": "Fire",
+        "report.toxic_gas": "Toxic Gas",
+        "report.bin_full": "Bin Full",
+        "report.other": "Other",
+        "report.custom_label": "Detailed Description:",
+        "report.custom_placeholder": "Enter detailed description of the issue...",
+        "report.send": "Send Report",
+        "report.cancel": "Cancel",
+        "report.success": "✅ Report sent successfully!",
+        "report.error": "❌ Error sending report:",
+        "report.select_type": "Please select an issue type!",
+        "report.enter_description": "Please enter detailed description!",
+        "history.title": "Disposal Log",
+        "history.loading": "Loading history...",
+        "history.empty": "No history data",
+        "history.error": "Error loading history",
+        "history.date": "Date",
+        "history.time": "Time",
+        "history.type": "Type",
+        "history.plastic": "Plastic",
+        "history.paper": "Paper",
+        "history.metal": "Metal",
+        "history.temp": "Temperature",
+        "history.gas": "Gas",
+        "history.wasteTitle": "Detected waste type log",
+        "history.wasteEmpty": "No detected waste events yet",
+        "history.battery": "Battery",
+        "statistics.title": "This Week Statistics",
+        "statistics.loading": "Loading statistics...",
+        "statistics.error": "Error loading statistics",
+        "statistics.mostCommon": "Most Common This Week",
+        "statistics.total": "Total",
+        "statistics.totalPlastic": "Total Plastic",
+        "statistics.totalPaper": "Total Paper",
+        "statistics.totalMetal": "Total Metal",
+        "export.csv": "📥 Export CSV",
+        "export.excel": "📊 Export Excel",
+        "export.summary": "📋 Summary",
+        "footer": "Smart Waste Monitoring System v3.0 • SE1912 • Group 2"
+      }
+    };
+    
+    // Get current language from localStorage or default to 'vi'
+    let currentLang = localStorage.getItem('lang') || 'vi';
+    let currentTheme = localStorage.getItem('theme') || 'dark';
+    
+    // Initialize theme
+    function initTheme() {
+      if (currentTheme === 'light') {
+        document.body.classList.add('light-theme');
+        document.getElementById('themeText').textContent = '☀️';
+      } else {
+        document.body.classList.remove('light-theme');
+        document.getElementById('themeText').textContent = '🌙';
+      }
+    }
+    
+    // Translate function
+    function translate(key) {
+      return translations[currentLang][key] || key;
+    }
+    
+    // Apply translations
+    function applyTranslations() {
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (key) {
+          el.textContent = translate(key);
+        }
+      });
+      document.getElementById('langText').textContent = currentLang.toUpperCase();
+    }
+    
+    // Toggle language
+    async function toggleLanguage() {
+      currentLang = currentLang === 'vi' ? 'en' : 'vi';
+      localStorage.setItem('lang', currentLang);
+      
+      // Đồng bộ ngôn ngữ với backend để cảnh báo tự động dùng đúng ngôn ngữ
+      try {
+        await fetch('/api/alert/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lang: currentLang })
+        });
+      } catch (e) {
+        console.log('Không thể cập nhật cấu hình cảnh báo:', e);
+      }
+      
+      applyTranslations();
+      // Reload dynamic content
+      if (document.getElementById('tab-history').classList.contains('active')) {
+        loadHistory();
+      }
+    }
+    
+    // Toggle theme
+    function toggleTheme() {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', currentTheme);
+      initTheme();
+    }
+    
+    // Initialize on load
+    initTheme();
+    applyTranslations();
+    
+    function switchTab(tabName) {
+      // Ẩn tất cả tabs
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      
+      // Hiển thị tab được chọn
+      $(`tab-${tabName}`).classList.add('active');
+      event.target.classList.add('active');
+      
+      // Load dữ liệu khi chuyển tab
+      if(tabName === 'history') loadHistory();
+
+      // Cập nhật lịch refresh theo tab đang active
+      scheduleAutoRefresh();
+    }
+    
+    // Ngưỡng cảnh báo từ server (đồng bộ với Telegram)
+    let alertConfig = { gas_threshold: 500, temp_threshold: 50, bin_threshold: 90 };
+    async function loadAlertConfig() {
+      try {
+        const r = await fetch('/api/alert/config');
+        if (r.ok) alertConfig = await r.json();
+      } catch (e) {}
+    }
+
+    function updateUI(data) {
+      // Cập nhật các thùng rác
+      const bins = ['plastic', 'paper', 'metal'];
+      const binTh = alertConfig.bin_threshold ?? 90;
+      bins.forEach(type => {
+        const val = data[type] || 0;
+        $(`v_${type}`).innerText = val + '%';
+        $(`f_${type}`).style.width = val + '%';
+        
+        let color = 'var(--accent)';
+        if(val >= binTh) color = 'var(--bad)';
+        else if(val > 70) color = 'var(--warn)';
+        $(`f_${type}`).style.background = color;
+      });
+
+      // Cập nhật môi trường - gas đã được backend chuẩn hóa (gas hoặc gas_raw)
+      const temp = data.temperature || 0;
+      const gas = data.gas ?? data.gas_raw ?? 0;
+      const gasTh = alertConfig.gas_threshold ?? 500;
+      const tempTh = alertConfig.temp_threshold ?? 50;
+      
+      $('temp').innerText = temp.toFixed(1) + '°C';
+      $('gas').innerText = gas + ' ppm';
+      $('rssi').innerText = (data.wifi_rssi || '--') + ' dBm';
+      
+      // Đổi màu đỏ nếu nguy hiểm (theo ngưỡng server)
+      if (temp >= tempTh) {
+        $('temp').style.color = 'var(--bad)';
+        $('temp').style.fontWeight = '800';
+      } else {
+        $('temp').style.color = 'var(--text)';
+        $('temp').style.fontWeight = '700';
+      }
+      
+      const gasDanger = gas > gasTh || (data.gas_level && String(data.gas_level).toUpperCase() === 'DANGER');
+      if (gasDanger) {
+        $('gas').style.color = 'var(--bad)';
+        $('gas').style.fontWeight = '800';
+      } else {
+        $('gas').style.color = 'var(--text)';
+        $('gas').style.fontWeight = '700';
+      }
+      
+      // Trạng thái báo động - dùng ngưỡng từ server (đồng bộ Telegram + web)
+      const isAlarm = (temp >= tempTh || gasDanger ||
+                      (data.plastic || 0) >= binTh || (data.paper || 0) >= binTh || (data.metal || 0) >= binTh);
+      $('alarm').innerText = isAlarm ? 'DANGER' : 'SAFE';
+      $('alarmBox').style.borderColor = isAlarm ? 'var(--bad)' : 'var(--border)';
+      $('alarm').style.color = isAlarm ? 'var(--bad)' : 'var(--ok)';
+
+      $('lastUpdate').innerText = new Date().toLocaleTimeString();
+
+      // Hiển thị dấu hiệu mock data nếu có
+      const mockIndicator = $('mockIndicator');
+      if (data.mock_indicator) {
+        mockIndicator.innerText = data.mock_indicator;
+        mockIndicator.style.display = 'block';
+      } else {
+        mockIndicator.style.display = 'none';
+      }
+    }
+
+    async function fetchData() {
+      try {
+        const res = await fetch('/api/status');
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        
+        updateUI(data);
+        $('statusDot').className = 'dot online';
+        $('statusText').innerText = translate('connected');
+      } catch (e) {
+        $('statusDot').className = 'dot offline';
+        $('statusText').innerText = translate('disconnected');
+      }
+    }
+
+    async function loadHistory() {
+      const historyContainer = $('historyLogContainer');
+      const wasteLogContainer = $('wasteLogList');
+      if (!historyContainer) return;
+      historyContainer.innerHTML = `<div style="text-align:center; color:var(--muted); padding:40px;">${translate('statistics.loading')}</div>`;
+      if (wasteLogContainer) {
+        wasteLogContainer.innerHTML = '';
+      }
+      
+      // 1) Thống kê 3 cột từ waste_logs (API /api/statistics/week)
+      try {
+        const resStats = await fetch('/api/statistics/week');
+        if (!resStats.ok) throw new Error(`HTTP ${resStats.status}`);
+        const data = await resStats.json();
+
+        if (data.error) throw new Error(data.error);
+
+        const mostCommon = data.most_common || 'plastic';
+        const totals = data.week_totals || {};
+
+        const binLabels = {
+          vi: { plastic: 'NHỰA', paper: 'GIẤY', metal: 'LON', total: 'Tổng', unit: 'lần bỏ rác' },
+          en: { plastic: 'PLASTIC', paper: 'PAPER', metal: 'METAL', total: 'Total', unit: 'events' }
+        };
+        const binLabel = binLabels[currentLang];
+
+        // Nội dung mô tả nhanh + số liệu tổng
+        historyContainer.innerHTML = `
+          <div class="history-stats" style="margin-bottom:16px;">
+            <div class="history-stat">
+              <div class="history-stat-label">${translate('statistics.totalPlastic')}</div>
+              <div class="history-stat-value">${(totals.plastic || 0).toFixed(0)}</div>
+            </div>
+            <div class="history-stat">
+              <div class="history-stat-label">${translate('statistics.totalPaper')}</div>
+              <div class="history-stat-value">${(totals.paper || 0).toFixed(0)}</div>
+            </div>
+            <div class="history-stat">
+              <div class="history-stat-label">${translate('statistics.totalMetal')}</div>
+              <div class="history-stat-value">${(totals.metal || totals.battery || 0).toFixed(0)}</div>
+            </div>
+          </div>
+        `;
+
+        const ctx = document.getElementById('weekChart')?.getContext('2d');
+        if (ctx) {
+          if (weekChart) weekChart.destroy();
+
+          const chartLabels = currentLang === 'vi' ? ['Nhựa', 'Giấy', 'Kim Loại'] : ['Plastic', 'Paper', 'Metal'];
+          const chartLabel = currentLang === 'vi' ? 'Số lần bỏ rác (7 ngày)' : 'Disposal count (7 days)';
+
+          weekChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: chartLabels,
+              datasets: [{
+                label: chartLabel,
+                data: [totals.plastic || 0, totals.paper || 0, (totals.metal ?? totals.battery ?? 0)],
+                backgroundColor: [
+                  'rgba(96, 165, 250, 0.6)',
+                  'rgba(34, 197, 94, 0.6)',
+                  'rgba(245, 158, 11, 0.6)'
+                ],
+                borderColor: [
+                  'rgba(96, 165, 250, 1)',
+                  'rgba(34, 197, 94, 1)',
+                  'rgba(245, 158, 11, 1)'
+                ],
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  labels: { 
+                    color: document.body.classList.contains('light-theme') ? '#1A1F2E' : '#EAF1FF'
+                  }
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: { 
+                    color: document.body.classList.contains('light-theme') ? '#6B7280' : '#9AB0D6'
+                  },
+                  grid: { 
+                    color: document.body.classList.contains('light-theme') ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'
+                  }
+                },
+                x: {
+                  ticks: { 
+                    color: document.body.classList.contains('light-theme') ? '#6B7280' : '#9AB0D6'
+                  },
+                  grid: { 
+                    color: document.body.classList.contains('light-theme') ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'
+                  }
+                }
+              }
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Error loading statistics from waste logs:', e);
+        historyContainer.innerHTML = `<div style="text-align:center; color:var(--bad); padding:40px;">${translate('statistics.error')}: ${e.message}</div>`;
+      }
+      
+      // Tải thêm nhật ký loại rác nhận được
+      if (wasteLogContainer) {
+        try {
+          const res2 = await fetch('/api/history');
+          if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
+          const logs = await res2.json();
+          
+          if (!logs || !logs.length) {
+            wasteLogContainer.innerHTML = `<div style="text-align:center; color:var(--muted); padding:16px;">${translate('history.wasteEmpty')}</div>`;
+          } else {
+            const hDate = translate('history.date');
+            const hTime = translate('history.time');
+            const hType = translate('history.type');
+            const wasteTypeMap = {
+              vi: { PLASTIC: 'Nhựa', PAPER: 'Giấy', METAL: 'Lon', BATTERY: 'Pin', UNKNOWN: 'Không xác định' },
+              en: { PLASTIC: 'Plastic', PAPER: 'Paper', METAL: 'Metal', BATTERY: 'Battery', UNKNOWN: 'Unknown' }
+            };
+            const tr = wasteTypeMap[currentLang] || wasteTypeMap.en;
+            const typeLabel = (raw) => tr[String(raw || '').toUpperCase()] || raw || '';
+            let html = `
+              <table class="history-table">
+                <thead>
+                  <tr>
+                    <th>${hDate}</th>
+                    <th>${hTime}</th>
+                    <th>${hType}</th>
+                  </tr>
+                </thead>
+                <tbody>
+            `;
+            // Hiển thị mới nhất trước
+            [...logs].reverse().forEach(item => {
+              html += `
+                <tr>
+                  <td>${item.date || ''}</td>
+                  <td>${item.time || ''}</td>
+                  <td>${typeLabel(item.type)}</td>
+                </tr>
+              `;
+            });
+            html += `</tbody></table>`;
+            wasteLogContainer.innerHTML = html;
+          }
+        } catch (e) {
+          console.error('Error loading waste logs:', e);
+          wasteLogContainer.innerHTML = `<div style="text-align:center; color:var(--bad); padding:16px;">${translate('history.error')}: ${e.message}</div>`;
+        }
+      }
+    }
+
+    function exportData(format, type) {
+      // format: 'csv', 'summary'
+      // type: 'detailed', 'summary'
+      const days = 7; // Có thể cho người dùng chọn
+      
+      let url = '';
+      let filename = '';
+      
+      if (type === 'summary') {
+        url = `/api/export/summary?days=${days}`;
+        filename = `wastevision_summary_${new Date().toISOString().slice(0,10)}.csv`;
+      } else if (format === 'csv') {
+        url = `/api/export/csv?days=${days}`;
+        filename = `wastevision_detail_${new Date().toISOString().slice(0,10)}.csv`;
+      }
+      
+      if (url) {
+        // Sử dụng fetch để download file
+        fetch(url)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Network response was not ok');
+            }
+            return response.blob();
+          })
+          .then(blob => {
+            // Tạo link tạm để download
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(link.href);
+          })
+          .catch(error => {
+            console.error('Export error:', error);
+            alert('Lỗi khi xuất file: ' + error.message);
+          });
+      }
+    }
+
+    function showReportModal() {
+      document.getElementById('reportModal').classList.add('active');
+      document.getElementById('reportResult').style.display = 'none';
+      // Reset form
+      document.querySelectorAll('input[name="reportType"]').forEach(r => r.checked = false);
+      document.getElementById('customMessage').value = '';
+      document.getElementById('customMessageGroup').style.display = 'none';
+      
+      // Show custom message when "other" is selected
+      document.querySelectorAll('input[name="reportType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+          if (this.value === 'other') {
+            document.getElementById('customMessageGroup').style.display = 'block';
+          } else {
+            document.getElementById('customMessageGroup').style.display = 'none';
+            document.getElementById('customMessage').value = '';
+          }
+        });
+      });
+    }
+
+    function closeReportModal() {
+      document.getElementById('reportModal').classList.remove('active');
+    }
+
+    async function sendReport() {
+      const selectedType = document.querySelector('input[name="reportType"]:checked');
+      if (!selectedType) {
+        alert(translate('report.select_type'));
+        return;
+      }
+
+      const type = selectedType.value;
+      const customMessage = document.getElementById('customMessage').value.trim();
+      
+      if (type === 'other' && !customMessage) {
+        alert(translate('report.enter_description'));
+        return;
+      }
+
+      const typeLabels = {
+        vi: {
+          machine_error: 'Máy lỗi',
+          fire: 'Cháy',
+          toxic_gas: 'Khí độc',
+          bin_full: 'Thùng đầy',
+          other: 'Khác'
+        },
+        en: {
+          machine_error: 'Machine Error',
+          fire: 'Fire',
+          toxic_gas: 'Toxic Gas',
+          bin_full: 'Bin Full',
+          other: 'Other'
+        }
+      };
+      
+      const typeLabel = typeLabels[currentLang][type] || type;
+
+      const resultDiv = document.getElementById('reportResult');
+      const loadingText = currentLang === 'vi' ? 'Đang gửi...' : 'Sending...';
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = `<div style="color:var(--muted);">${loadingText}</div>`;
+
+      try {
+        const res = await fetch('/api/alert/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: typeLabel,
+            custom_message: type === 'other' ? customMessage : '',
+            lang: currentLang  // Gửi kèm ngôn ngữ hiện tại
+          })
+        });
+
+        const data = await res.json();
+        
+        if (data.success) {
+          resultDiv.style.background = 'var(--ok)';
+          resultDiv.style.color = '#000';
+          resultDiv.innerHTML = translate('report.success');
+          // Reset form after 2 seconds
+          setTimeout(() => {
+            closeReportModal();
+          }, 2000);
+        } else {
+          resultDiv.style.background = 'var(--bad)';
+          resultDiv.style.color = '#fff';
+          resultDiv.innerHTML = translate('report.error') + ' ' + (data.error || 'Không xác định');
+        }
+      } catch (e) {
+        resultDiv.style.background = 'var(--bad)';
+        resultDiv.style.color = '#fff';
+        resultDiv.innerHTML = translate('report.error') + ' ' + e.message;
+      }
+    }
+
+
+    // Auto refresh
+    const REFRESH_ACTIVE_MS = 12_000;     // History/Statistics: 10-15s/lần
+    const REFRESH_IDLE_MS = 300_000;      // Dashboard khi ẩn tab / thu nhỏ: 5 phút/lần
+    const REFRESH_DASHBOARD_MS = 1_000;   // Dashboard khi đang xem
+
+    const _timers = {
+      status: null,
+      history: null
+    };
+
+    function _clearTimer(key) {
+      if (_timers[key]) {
+        clearInterval(_timers[key]);
+        _timers[key] = null;
+      }
+    }
+
+    function _getActiveTabName() {
+      const el = document.querySelector('.tab-content.active');
+      if (!el || !el.id) return 'dashboard';
+      return el.id.replace('tab-', '');
+    }
+
+    function scheduleAutoRefresh() {
+      const activeTab = _getActiveTabName();
+      const isHidden = document.hidden;
+
+      // Dừng timers cũ
+      _clearTimer('status');
+      _clearTimer('history');
+
+      // 1) Status (header + dashboard): khi đang xem dashboard -> 1s; còn lại/ẩn -> 5 phút
+      const statusInterval =
+        (isHidden || activeTab !== 'dashboard') ? REFRESH_IDLE_MS : REFRESH_DASHBOARD_MS;
+      _timers.status = setInterval(fetchData, statusInterval);
+
+      // Refresh ngay khi đổi trạng thái (đảm bảo chuyển tab thấy dữ liệu mới)
+      // - Nếu đang ở dashboard hoặc vừa quay lại màn hình (không hidden) thì fetch ngay
+      if (!isHidden) fetchData();
+
+      // 2) History: chỉ refresh nhanh khi đang active và không hidden
+      if (!isHidden && activeTab === 'history') {
+        loadHistory();
+        _timers.history = setInterval(loadHistory, REFRESH_ACTIVE_MS);
+      }
+    }
+
+    // Khi thu nhỏ / chuyển tab trình duyệt / quay lại
+    document.addEventListener('visibilitychange', scheduleAutoRefresh);
+    window.addEventListener('focus', scheduleAutoRefresh);
+    window.addEventListener('blur', scheduleAutoRefresh);
+
+    // Tải ngưỡng cảnh báo từ server (để gas/nhiệt độ báo đúng trên web)
+    loadAlertConfig();
+    scheduleAutoRefresh();
+  </script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+
+# CHI TIẾT GIẢI THÍCH FILE WEB.PY
+
+File `web.py` là mã nguồn Python sử dụng framework **Flask** để xây dựng một Web Server quản lý hệ thống thùng rác thông minh (Smart Bin). Server này đóng vai trò trung gian "Bộ não", kết nối giữa phần cứng (ESP32), giao diện người dùng (Web Dashboard), và hệ thống cảnh báo (Telegram).
+
+Dưới đây là giải thích chi tiết từng thành phần trong file:
+
+## 1. Khai báo thư viện và Khởi tạo
+- **Thư viện chính**:
+  - `Flask`: Tạo web server và các API.
+  - `requests`: Gửi HTTP request tới ESP32 hoặc Webhook Telegram.
+  - `json`, `csv`: Xử lý dữ liệu định dạng JSON và CSV.
+  - `threading`: Xử lý đa luồng (chạy luồng giám sát nền).
+  - `time`, `datetime`: Xử lý thời gian.
+
+## 2. Cấu hình hệ thống (Configuration)
+Các biến cấu hình quan trọng được định nghĩa ở đầu file (Global Variables):
+- `ESP32_IP`: Địa chỉ IP của mạch ESP32 để server giao tiếp (lấy dữ liệu cảm biến). Có thể lấy từ biến môi trường hoặc dùng giá trị mặc định.
+- `DATA_FILE` (`sensor_history.json`): File lưu trữ lịch sử dữ liệu cảm biến (nhiệt độ, khí gas, mức đầy thùng) theo thời gian.
+- `LOG_FILE` (`waste_logs.json`): File lưu trữ nhật ký phân loại rác (ví dụ: phát hiện 1 chai nhựa lúc 10:00).
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`: Thông tin để bot Telegram gửi tin nhắn cảnh báo đến người dùng.
+- `CONFIG_FILE` (`alert_config.json`): File lưu ngưỡng cảnh báo (ngưỡng gas, nhiệt độ, mức đầy). Hệ thống sẽ tải các giá trị này khi khởi động.
+
+## 3. Các hàm hỗ trợ (Helper Functions)
+- `_visual_bar(percent)`: Tạo một thanh hiển thị trạng thái dạng text (ví dụ: `▓▓▓░░░░░░░`) để gửi qua Telegram cho trực quan.
+- `_level_label(pct)`: Đánh giá mức độ cảnh báo (Cao, Trung bình, Thấp) dựa trên phần trăm.
+- `send_telegram(message)`: Hàm gửi tin nhắn đến Telegram.
+- `send_waste_telegram(waste_type)`: Hàm chuyên biệt để gửi thông báo khi phát hiện rác mới.
+  - **Cơ chế đặc biệt**: Có bộ đếm thời gian (`waste_telegram_cooldown_sec`) để tránh spam tin nhắn nếu ESP32 gửi liên tục nhiều tín hiệu cho cùng một vật thể trong thời gian ngắn (ví dụ 15 giây).
+
+## 4. Quản lý Log rác (Logging)
+- `init_waste_log()`: Tạo file log rác nếu chưa tồn tại.
+- `append_waste_log(waste_type)`: Ghi nhận một mục rác mới vào file JSON.
+  - Hàm này cũng có cơ chế chống ghi trùng lặp (debounce) tương tự như gửi Telegram, để đảm bảo thống kê chính xác.
+
+## 5. Luồng giám sát tự động (Auto Monitor Thread)
+Hàm `auto_monitor()` là "trái tim" của hệ thống giám sát thời gian thực, chạy trên một luồng riêng biệt (`threading.Thread`):
+- **Vòng lặp vô hạn**: Chạy liên tục để kiểm tra trạng thái.
+- **Giao tiếp ESP32**: Gọi API `/status` của ESP32 để lấy dữ liệu mới nhất (Nhiệt độ, Gas, Mức đầy các thùng Nhựa/Giấy/Kim loại).
+- **Cập nhật Cache**: Lưu dữ liệu mới nhất vào biến `latest_data` để Web UI có thể truy xuất ngay lập tức mà không cần chờ ESP32 phản hồi lại.
+- **Lưu lịch sử (Data Logging)**: Gọi `save_data_realtime` để ghi dữ liệu vào `sensor_history.json`.
+  - **Thông minh**: Tần suất lưu thay đổi động. Nếu có người đang xem Web (`ACTIVE`), lưu dày hơn (10-15s/lần). Nếu không (`IDLE`), lưu thưa hơn (5 phút/lần) để tối ưu dung lượng.
+- **Hệ thống Cảnh báo (Alert System)**:
+  - So sánh dữ liệu thực tế với ngưỡng cấu hình (`gas_threshold`, `temp_threshold`, `bin_threshold`).
+  - Nếu vượt ngưỡng, gửi cảnh báo ngay lập tức qua Telegram.
+  - Có cơ chế chống spam cảnh báo (chỉ nhắc lại sau mỗi 5 phút nếu tình trạng vẫn nguy hiểm).
+
+## 6. Các API Endpoints (Flask Routes)
+Đây là các đường dẫn mà Web Frontend (HTML/JS) hoặc ESP32 sẽ gọi tới:
+
+- **Giao diện & Trạng thái**:
+  - `/`: Trả về giao diện chính (`index.html`).
+  - `/api/status`: Trả về dữ liệu cảm biến mới nhất từ bộ nhớ Cache (RAM), giúp phản hồi cực nhanh.
+
+- **Lịch sử & Phân loại**:
+  - `/api/history` (GET/POST):
+    - **POST**: ESP32 gọi API này khi phân loại xong rác -> Server ghi log và gửi Telegram.
+    - **GET**: Web UI gọi để lấy danh sách lịch sử rác đã phân loại.
+  - `/api/detect` (POST): Một endpoint khác dành cho ESP32 báo cáo phát hiện rác (tương tự `/api/history` POST).
+
+- **Thống kê & Báo cáo**:
+  - `/api/statistics/week`: Tính toán và trả về thống kê số lượng rác theo từng loại trong 7 ngày qua.
+  - `/api/history/detailed`: Lấy dữ liệu biểu đồ chi tiết cho trang Statistics.
+
+- **Cấu hình & Tiện ích**:
+  - `/api/alert/config`: Đọc hoặc cập nhật các ngưỡng cảnh báo từ giao diện Web.
+  - `/api/alert/telegram`: Cho phép gửi báo cáo thủ công từ Web về Telegram.
+  - `/api/export/csv` & `/api/export/summary`: Xuất dữ liệu lịch sử ra file Excel/CSV để người dùng tải về.
+
+## 7. Khởi chạy Server (`if __name__ == '__main__'`)
+- In ra các thông tin cấu hình (IP, Bot Token).
+- Khởi tạo file log.
+- Khởi động luồng `auto_monitor` (chỉ chạy một lần).
+- Chạy Flask server trên cổng 5000, lắng nghe mọi IP (`0.0.0.0`).
+
+---
+**Tóm tắt**: File này hoạt động như một trung tâm điều khiển, vừa thu thập dữ liệu tự động, vừa phục vụ giao diện thống kê, vừa đóng vai trò hệ thống cảnh báo an toàn.

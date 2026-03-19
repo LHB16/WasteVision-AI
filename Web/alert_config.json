@@ -1,0 +1,6 @@
+{
+  "lang": "en",
+  "temp_threshold": 45,
+  "gas_threshold": 500,
+  "bin_threshold": 92
+}

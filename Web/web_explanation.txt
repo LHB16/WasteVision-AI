@@ -1,0 +1,294 @@
+WasteVision Web Server (`web.py`) - English Explanation
+======================================================
+
+1. Overview
+-----------
+- This file implements a Flask-based web server for the WasteVision project.
+- It communicates with an ESP32 device that measures bin fill levels, temperature, and gas concentration.
+- It sends alerts to Telegram, stores sensor history on disk, and exposes multiple JSON APIs for the web dashboard and statistics pages.
+
+2. Global Configuration and State
+---------------------------------
+- Reads `ESP32_IP` from the `ESP32_IP` environment variable (with a default IP) to avoid hard-coding the device address.
+- Uses:
+  - `sensor_history.json` to store detailed time-series sensor readings.
+  - `waste_logs.json` to store a simple log of detected waste types (PLASTIC, PAPER, METAL, etc.).
+  - `alert_config.json` to store thresholds for gas, temperature, and bin fullness.
+- Maintains in-memory variables:
+  - `latest_data`: the latest JSON status received from ESP32.
+  - `is_esp_online`: whether the ESP32 was reachable during the last poll.
+  - `last_alerts`: timestamps to throttle repeated alerts.
+  - `last_waste_telegram`: timestamps to avoid sending duplicate waste-type Telegram messages.
+- Uses multiple threading locks (`data_lock`, `alert_lock`, `_history_save_lock`, `waste_telegram_lock`) to avoid race conditions between the background monitor thread and HTTP requests.
+
+3. Helper Functions
+-------------------
+- `_mark_client_active(ttl_sec)`: marks that at least one client is currently viewing history/statistics, which increases the frequency of history writes.
+- `_get_history_save_interval_sec()`: returns either a short (active) or long (idle) interval based on recent client activity.
+- `get_now()` / `get_now_short()`: format the current datetime for logs and Telegram footers.
+- `_visual_bar(percent, segments)`: returns a text progress bar string for use in Telegram messages.
+- `_level_label(pct)`: converts a numeric percentage to qualitative labels (High/Medium/Low).
+- `send_telegram(message)`: sends a message to a configured Telegram chat using a bot token.
+- `send_waste_telegram(waste_type, entry_time)`: sends a Telegram alert for newly detected waste, with a cooldown per waste type.
+
+4. Waste Log Management
+-----------------------
+- `init_waste_log()`: ensures that `waste_logs.json` exists and is initialized with an empty list.
+- `append_waste_log(waste_type)`: appends a new entry to `waste_logs.json` with `time`, `date`, and `type`:
+  - Skips duplicates if the same waste type was logged within the last 15 seconds.
+  - Truncates the log to the most recent 5000 entries to keep the file size manageable.
+
+5. Background Monitoring Thread
+-------------------------------
+- `auto_monitor()` runs in a daemon thread:
+  - Periodically calls `GET {ESP32_IP}/status` to fetch the latest sensor readings from ESP32.
+  - Normalizes fields:
+    - Ensures `metal` is present (backward compatible with older `battery` key).
+    - Normalizes gas readings so that a numeric `gas` field is always present.
+  - Updates in-memory cache (`latest_data`, `is_esp_online`) under lock.
+  - Calls `save_data_realtime()` to append to `sensor_history.json` with rate limiting.
+  - Implements alert logic based on `ALERT_CONFIG` thresholds:
+    - Gas alert: considers both numeric gas value and optional `gas_level` code from ESP32.
+    - Temperature alert.
+    - Bin-full alerts for plastic, paper, and metal bins.
+  - Uses `last_alerts` timestamps to throttle alerts (minimum 5 minutes between alerts of the same type).
+
+6. History Persistence and Statistics
+-------------------------------------
+- `save_data_realtime(data, now)`:
+  - Controls how often sensor readings are persisted to `sensor_history.json` based on the active/idle state.
+  - Groups records by date (`YYYY-MM-DD`) and limits each day to 1000 records.
+  - Maintains per-day summary statistics:
+    - Average temperature.
+    - Number of records.
+    - Last update timestamp.
+    - Counters for how many times each bin reached or exceeded the FULL_THRESHOLD.
+- The file structure of `sensor_history.json` is:
+  - `{ "YYYY-MM-DD": { "records": [...], "summary": {...} }, ... }`.
+
+7. Flask Routes / APIs
+----------------------
+1) `GET /`
+   - Renders `index.html`, which is the main web dashboard.
+
+2) `GET /api/status`
+   - Returns the latest in-memory sensor data from ESP32 (`latest_data`) if `is_esp_online` is True.
+   - Returns `{"error": "Offline"}` with HTTP status 503 if ESP32 is not reachable.
+
+3) `GET or POST /api/history`
+   - POST:
+     - Expects JSON `{"type": "PLASTIC" | "PAPER" | "METAL" | ...}` from ESP32 or another client.
+     - Appends the waste type to `waste_logs.json` via `append_waste_log()`.
+     - Sends a Telegram alert via `send_waste_telegram()`.
+   - GET:
+     - Returns the full waste log as a JSON list.
+     - Calls `_mark_client_active()` to temporarily increase history save frequency.
+
+4) `GET /api/history/detailed`
+   - Returns detailed time-series sensor history from `sensor_history.json`.
+   - Query parameters:
+     - `days`: how many days back to include (default 7).
+     - `limit`: maximum number of records per day.
+   - For each day, returns both summary and truncated `records`.
+
+5) `POST /api/detect`
+   - Alternative endpoint for ESP32 to report newly detected waste types.
+   - Very similar to the POST of `/api/history`:
+     - Logs the waste type.
+     - Sends a Telegram notification.
+
+6) `GET /api/history/waste`
+   - Backward-compatible alias that returns the same waste log as `/api/history`.
+   - Preserved for older clients that still use the old URL.
+
+7) `GET /api/statistics/week`
+   - Reads `waste_logs.json` and computes statistics for the last 7 days by default:
+     - Total counts of PLASTIC, PAPER, and METAL/BATTERY.
+     - The most common waste type within that period.
+   - Returns a JSON object with `week_totals` and `most_common`.
+
+8) `GET or POST /api/alert/config`
+   - GET:
+     - Returns the current `ALERT_CONFIG` in JSON form.
+   - POST:
+     - Receives a partial configuration JSON (e.g. new thresholds).
+     - Updates `ALERT_CONFIG` in memory and writes it back to `alert_config.json`.
+
+9) `POST /api/alert/telegram`
+   - Allows manual incident reports from the web UI.
+   - Expects JSON with `type` and optional `custom_message`.
+   - Sends a formatted Telegram alert to the configured chat.
+
+10) `GET /api/export/csv`
+    - Exports detailed sensor records from `sensor_history.json` as a CSV file.
+    - Query parameter `days` selects how many days of data to include.
+    - CSV columns: Date, Time, Plastic (%), Paper (%), Metal (%), Temperature (°C), Gas.
+
+11) `GET /api/export/summary`
+    - Exports daily summary statistics as a CSV file.
+    - Query parameter `days` selects how many days to include.
+    - CSV columns: Date, Total Plastic, Total Paper, Total Metal, Avg Temperature, Record Count, Last Updated.
+
+8. Background Thread Control
+----------------------------
+- Global flags:
+  - `_monitor_started`, `_monitor_lock`, `_monitor_thread` ensure the monitor is started only once.
+- `start_monitor_if_needed()`:
+  - Starts the `auto_monitor` daemon thread if it is not running yet.
+  - Thread continues running for the lifetime of the process, polling ESP32 and handling alerts.
+
+9. Application Entry Point
+--------------------------
+- When `web.py` is executed directly:
+  - Prints startup information (ESP32 IP, Telegram bot token prefix, chat ID, and local web URL).
+  - Calls `init_waste_log()` to ensure the waste log file exists.
+  - Calls `start_monitor_if_needed()` to start the background monitoring thread.
+  - Runs the Flask application on `0.0.0.0:5000` with `debug=True` and `use_reloader=False`.
+
+WasteVision Web Server (`web.py`) - English Explanation
+======================================================
+
+1. Overview
+-----------
+- This file implements a Flask-based web server for the WasteVision project.
+- It communicates with an ESP32 device that measures bin fill levels, temperature, and gas concentration.
+- It sends alerts to Telegram, stores sensor history on disk, and exposes multiple JSON APIs for the web dashboard and statistics pages.
+
+2. Global Configuration and State
+---------------------------------
+- Reads `ESP32_IP` from the `ESP32_IP` environment variable (with a default IP) to avoid hard-coding the device address.
+- Uses:
+  - `sensor_history.json` to store detailed time-series sensor readings.
+  - `waste_logs.json` to store a simple log of detected waste types (PLASTIC, PAPER, METAL, etc.).
+  - `alert_config.json` to store thresholds for gas, temperature, and bin fullness.
+- Maintains in-memory variables:
+  - `latest_data`: the latest JSON status received from ESP32.
+  - `is_esp_online`: whether the ESP32 was reachable during the last poll.
+  - `last_alerts`: timestamps to throttle repeated alerts.
+  - `last_waste_telegram`: timestamps to avoid sending duplicate waste-type Telegram messages.
+- Uses multiple threading locks (`data_lock`, `alert_lock`, `_history_save_lock`, `waste_telegram_lock`) to avoid race conditions between the background monitor thread and HTTP requests.
+
+3. Helper Functions
+-------------------
+- `_mark_client_active(ttl_sec)`: marks that at least one client is currently viewing history/statistics, which increases the frequency of history writes.
+- `_get_history_save_interval_sec()`: returns either a short (active) or long (idle) interval based on recent client activity.
+- `get_now()` / `get_now_short()`: format the current datetime for logs and Telegram footers.
+- `_visual_bar(percent, segments)`: returns a text progress bar string for use in Telegram messages.
+- `_level_label(pct)`: converts a numeric percentage to qualitative labels (High/Medium/Low).
+- `send_telegram(message)`: sends a message to a configured Telegram chat using a bot token.
+- `send_waste_telegram(waste_type, entry_time)`: sends a Telegram alert for newly detected waste, with a cooldown per waste type.
+
+4. Waste Log Management
+-----------------------
+- `init_waste_log()`: ensures that `waste_logs.json` exists and is initialized with an empty list.
+- `append_waste_log(waste_type)`: appends a new entry to `waste_logs.json` with `time`, `date`, and `type`:
+  - Skips duplicates if the same waste type was logged within the last 15 seconds.
+  - Truncates the log to the most recent 5000 entries to keep the file size manageable.
+
+5. Background Monitoring Thread
+-------------------------------
+- `auto_monitor()` runs in a daemon thread:
+  - Periodically calls `GET {ESP32_IP}/status` to fetch the latest sensor readings from ESP32.
+  - Normalizes fields:
+    - Ensures `metal` is present (backward compatible with older `battery` key).
+    - Normalizes gas readings so that a numeric `gas` field is always present.
+  - Updates in-memory cache (`latest_data`, `is_esp_online`) under lock.
+  - Calls `save_data_realtime()` to append to `sensor_history.json` with rate limiting.
+  - Implements alert logic based on `ALERT_CONFIG` thresholds:
+    - Gas alert: considers both numeric gas value and optional `gas_level` code from ESP32.
+    - Temperature alert.
+    - Bin-full alerts for plastic, paper, and metal bins.
+  - Uses `last_alerts` timestamps to throttle alerts (minimum 5 minutes between alerts of the same type).
+
+6. History Persistence and Statistics
+-------------------------------------
+- `save_data_realtime(data, now)`:
+  - Controls how often sensor readings are persisted to `sensor_history.json` based on the active/idle state.
+  - Groups records by date (`YYYY-MM-DD`) and limits each day to 1000 records.
+  - Maintains per-day summary statistics:
+    - Average temperature.
+    - Number of records.
+    - Last update timestamp.
+    - Counters for how many times each bin reached or exceeded the FULL_THRESHOLD.
+- The file structure of `sensor_history.json` is:
+  - `{ "YYYY-MM-DD": { "records": [...], "summary": {...} }, ... }`.
+
+7. Flask Routes / APIs
+----------------------
+1) `GET /`
+   - Renders `index.html`, which is the main web dashboard.
+
+2) `GET /api/status`
+   - Returns the latest in-memory sensor data from ESP32 (`latest_data`) if `is_esp_online` is True.
+   - Returns `{"error": "Offline"}` with HTTP status 503 if ESP32 is not reachable.
+
+3) `GET or POST /api/history`
+   - POST:
+     - Expects JSON `{"type": "PLASTIC" | "PAPER" | "METAL" | ...}` from ESP32 or another client.
+     - Appends the waste type to `waste_logs.json` via `append_waste_log()`.
+     - Sends a Telegram alert via `send_waste_telegram()`.
+   - GET:
+     - Returns the full waste log as a JSON list.
+     - Calls `_mark_client_active()` to temporarily increase history save frequency.
+
+4) `GET /api/history/detailed`
+   - Returns detailed time-series sensor history from `sensor_history.json`.
+   - Query parameters:
+     - `days`: how many days back to include (default 7).
+     - `limit`: maximum number of records per day.
+   - For each day, returns both summary and truncated `records`.
+
+5) `POST /api/detect`
+   - Alternative endpoint for ESP32 to report newly detected waste types.
+   - Very similar to the POST of `/api/history`:
+     - Logs the waste type.
+     - Sends a Telegram notification.
+
+6) `GET /api/history/waste`
+   - Backward-compatible alias that returns the same waste log as `/api/history`.
+   - Preserved for older clients that still use the old URL.
+
+7) `GET /api/statistics/week`
+   - Reads `waste_logs.json` and computes statistics for the last 7 days by default:
+     - Total counts of PLASTIC, PAPER, and METAL/BATTERY.
+     - The most common waste type within that period.
+   - Returns a JSON object with `week_totals` and `most_common`.
+
+8) `GET or POST /api/alert/config`
+   - GET:
+     - Returns the current `ALERT_CONFIG` in JSON form.
+   - POST:
+     - Receives a partial configuration JSON (e.g. new thresholds).
+     - Updates `ALERT_CONFIG` in memory and writes it back to `alert_config.json`.
+
+9) `POST /api/alert/telegram`
+   - Allows manual incident reports from the web UI.
+   - Expects JSON with `type` and optional `custom_message`.
+   - Sends a formatted Telegram alert to the configured chat.
+
+10) `GET /api/export/csv`
+    - Exports detailed sensor records from `sensor_history.json` as a CSV file.
+    - Query parameter `days` selects how many days of data to include.
+    - CSV columns: Date, Time, Plastic (%), Paper (%), Metal (%), Temperature (°C), Gas.
+
+11) `GET /api/export/summary`
+    - Exports daily summary statistics as a CSV file.
+    - Query parameter `days` selects how many days to include.
+    - CSV columns: Date, Total Plastic, Total Paper, Total Metal, Avg Temperature, Record Count, Last Updated.
+
+8. Background Thread Control
+----------------------------
+- Global flags:
+  - `_monitor_started`, `_monitor_lock`, `_monitor_thread` ensure the monitor is started only once.
+- `start_monitor_if_needed()`:
+  - Starts the `auto_monitor` daemon thread if it is not running yet.
+  - Thread continues running for the lifetime of the process, polling ESP32 and handling alerts.
+
+9. Application Entry Point
+--------------------------
+- When `web.py` is executed directly:
+  - Prints startup information (ESP32 IP, Telegram bot token prefix, chat ID, and local web URL).
+  - Calls `init_waste_log()` to ensure the waste log file exists.
+  - Calls `start_monitor_if_needed()` to start the background monitoring thread.
+  - Runs the Flask application on `0.0.0.0:5000` with `debug=True` and `use_reloader=False`.
+

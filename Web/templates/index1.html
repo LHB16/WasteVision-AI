@@ -1,0 +1,124 @@
+<!-- templates/index.html -->
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Waste Classifier Control Panel</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; }
+    .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; width: 360px; }
+    label { display:block; margin-top: 10px; font-size: 14px; }
+    input, select { width: 100%; padding: 8px; margin-top: 6px; }
+    button { padding: 10px 12px; margin-top: 12px; cursor: pointer; }
+    .video { border: 1px solid #ddd; border-radius: 10px; padding: 10px; }
+    img { max-width: 900px; width: 100%; border-radius: 10px; }
+    .small { font-size: 12px; color: #555; }
+  </style>
+</head>
+<body>
+  <h2>Waste Classification – Camera + ESP32 Control</h2>
+
+  <div class="row">
+    <div class="card">
+      <h3>Cấu hình</h3>
+
+      <label>Camera index</label>
+      <select id="camera_index">
+        <option value="0">0 (default)</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+      </select>
+
+      <label>ESP32 IP</label>
+      <input id="esp32_ip" placeholder="Ví dụ: 192.168.1.50" value="{{ state.esp32_ip }}"/>
+
+      <label>Port</label>
+      <input id="esp32_port" type="number" value="{{ state.esp32_port }}"/>
+
+      <label>Protocol</label>
+      <select id="protocol">
+        <option value="http_get">HTTP GET (/cmd?c=Label)</option>
+        <option value="http_post">HTTP POST JSON (/cmd {"command":...})</option>
+        <option value="udp">UDP (payload = Label)</option>
+      </select>
+
+      <label>Confidence threshold (0..1)</label>
+      <input id="threshold" type="number" step="0.01" min="0" max="1" value="{{ state.threshold }}"/>
+
+      <label>Cooldown seconds</label>
+      <input id="cooldown_s" type="number" step="0.1" min="0" value="{{ state.cooldown_s }}"/>
+
+      <label>Auto-send</label>
+      <select id="running">
+        <option value="true">ON</option>
+        <option value="false">OFF</option>
+      </select>
+
+      <button onclick="applyConfig()">Apply</button>
+
+      <hr/>
+
+      <label>Test send command</label>
+      <select id="test_cmd">
+        <option value="Paper">Paper</option>
+        <option value="Plastic">Plastic</option>
+        <option value="Metal">Metal</option>
+      </select>
+      <button onclick="testSend()">Send Test</button>
+
+      <div class="small" id="status" style="margin-top:10px;"></div>
+      <div class="small">
+        Gợi ý ESP32 endpoint:
+        <ul>
+          <li>HTTP GET: <code>/cmd?c=Paper</code></li>
+          <li>HTTP POST: <code>POST /cmd</code> body JSON</li>
+          <li>UDP: nhận chuỗi <code>Paper</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="video">
+      <h3>Live</h3>
+      <img src="/video_feed" alt="video stream"/>
+    </div>
+  </div>
+
+<script>
+async function applyConfig(){
+  const payload = {
+    camera_index: parseInt(document.getElementById("camera_index").value, 10),
+    esp32_ip: document.getElementById("esp32_ip").value.trim(),
+    esp32_port: parseInt(document.getElementById("esp32_port").value, 10),
+    protocol: document.getElementById("protocol").value,
+    threshold: parseFloat(document.getElementById("threshold").value),
+    cooldown_s: parseFloat(document.getElementById("cooldown_s").value),
+    running: document.getElementById("running").value === "true"
+  };
+
+  const r = await fetch("/api/config", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json();
+  document.getElementById("status").innerText = j.ok ? "Applied config OK" : "Apply config failed";
+}
+
+async function testSend(){
+  const cmd = document.getElementById("test_cmd").value;
+  const r = await fetch("/api/test_send", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({command: cmd})
+  });
+  const j = await r.json();
+  document.getElementById("status").innerText =
+    j.ok ? ("Test send OK: " + cmd) : ("Test send FAILED: " + (j.error || "unknown"));
+}
+</script>
+</body>
+</html>
