@@ -1,0 +1,30 @@
+# Large files
+*.pth
+*.pdf
+*.jpg
+*.jpeg
+*.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# JSON logs (keep structure but ignore content)
+sensor_history.json
+waste_logs.json
