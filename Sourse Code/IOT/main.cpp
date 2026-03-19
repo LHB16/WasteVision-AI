@@ -25,8 +25,8 @@ bool isObjectPresent();
 String serverIP = "192.168.137.1";
 
 // Config
-const char *ssid = "Quoc Inh";
-const char *password = "chauquocinh";
+const char *ssid = "YOUR_WIFI_SSID";
+const char *password = "YOUR_WIFI_PASSWORD";
 #define localPort 4210
 WebServer server(80);
 

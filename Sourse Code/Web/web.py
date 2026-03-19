@@ -19,8 +19,8 @@ ESP32_IP = os.environ.get("ESP32_IP", "http://192.168.137.221")
 DATA_FILE = "sensor_history.json"
 # Log of new waste received (for history + 3-column statistics)
 LOG_FILE = "waste_logs.json"
-TELEGRAM_BOT_TOKEN = "8030669263:AAE_yYxwTVv0IVFsh0t32a2L4sOKW9Ljx1o"
-TELEGRAM_CHAT_ID = "5853966423"
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 # Load alert configuration from alert_config.json
 CONFIG_FILE = "alert_config.json"
