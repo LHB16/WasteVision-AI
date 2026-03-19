@@ -1,6 +1,10 @@
 # Large files
 *.pth
 *.pdf
+# Allow specific images for assets
+!assets/*.jpg
+!assets/*.jpeg
+!assets/*.png
 *.jpg
 *.jpeg
 *.png
