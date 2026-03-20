@@ -264,8 +264,8 @@ WasteVision-AI/
 | Name | Student ID | Role |
 |------|-----------|------|
 | Chau Quoc Inh | CE190593 | Team Lead |
-| Tran Minh Phuoc | CE190754 | Hardware / Firmware |
-| Luu Huu Binh | CE200315 | AI / ML |
+| Tran Minh Phuoc | CE190754 | AI / ML |
+| Luu Huu Binh | CE200315 | Hardware / Firmware |
 | Tran Nguyen Thien Thanh | CE200089 | Web Backend |
 | Nguyen Huu Phat | CE200437 | Web Frontend |
 
